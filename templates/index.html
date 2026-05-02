@@ -38,7 +38,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     h1 {
       font-size: 20px;
@@ -74,6 +74,42 @@
     .btn-add:hover   { opacity: .85; }
     .btn-add:active  { transform: scale(.97); }
     .btn-add::before { content: "+"; font-size: 18px; line-height: 1; }
+
+    /* ── 絞り込みバー ── */
+    .filter-bar {
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .filter-bar svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #a0aec0;
+      pointer-events: none;
+    }
+    .filter-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 12px 0 38px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #fff;
+      color: #1a1a2e;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .filter-input:focus {
+      outline: none;
+      border-color: #4ade80;
+      box-shadow: 0 0 0 3px rgba(74,222,128,.15);
+    }
+    .filter-count {
+      font-size: 12px;
+      color: #a0aec0;
+      margin-top: 6px;
+    }
 
     /* ── テーブル ── */
     .table-wrap {
@@ -127,6 +163,14 @@
     }
     .product-link:hover { text-decoration: underline; color: #2b6cb0; }
 
+    /* ハイライト */
+    mark {
+      background: #fef08a;
+      color: inherit;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
     /* 価格 */
     .price-target {
       font-weight: 600;
@@ -154,6 +198,15 @@
       text-decoration: none;
     }
     .empty a:hover { text-decoration: underline; }
+
+    /* 検索結果なし */
+    .no-results {
+      text-align: center;
+      padding: 40px 24px;
+      color: #a0aec0;
+      font-size: 14px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -168,6 +221,19 @@
     <a href="/add" class="btn-add">商品を追加</a>
   </div>
 
+  {% if products %}
+  <!-- 絞り込み検索バー -->
+  <div class="filter-bar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input type="text" id="filter-input" class="filter-input"
+           placeholder="商品名で絞り込む…" autocomplete="off">
+  </div>
+  <p class="filter-count" id="filter-count"></p>
+  {% endif %}
+
   <div class="table-wrap">
     {% if products %}
     <table>
@@ -180,9 +246,9 @@
           <th>追加者</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="product-tbody">
         {% for p in products %}
-        <tr>
+        <tr data-name="{{ p.name | lower }}">
           <td>
             {% set site_lower = p.site | lower %}
             {% if "costco" in site_lower %}
@@ -195,7 +261,7 @@
               <span class="badge">{{ p.site }}</span>
             {% endif %}
           </td>
-          <td>
+          <td class="name-cell">
             {% if p.url %}
               <a href="{{ p.url }}" target="_blank" class="product-link">{{ p.name }}</a>
             {% else %}
@@ -219,6 +285,7 @@
         {% endfor %}
       </tbody>
     </table>
+    <div class="no-results" id="no-results">該当する商品が見つかりません</div>
     {% else %}
     <div class="empty">
       <p>まだ監視商品はありません</p>
@@ -227,6 +294,72 @@
     {% endif %}
   </div>
 </div>
+
+{% if products %}
+<script>
+  const filterInput = document.getElementById('filter-input');
+  const filterCount = document.getElementById('filter-count');
+  const noResults   = document.getElementById('no-results');
+  const rows        = Array.from(document.querySelectorAll('#product-tbody tr'));
+  const total       = rows.length;
+
+  // 各行の元の商品名テキストを保持（ハイライト再描画用）
+  const originalNames = rows.map(r => {
+    const cell = r.querySelector('.name-cell');
+    const link = cell.querySelector('a');
+    return { cell, link, text: link ? link.textContent : cell.textContent };
+  });
+
+  filterInput.addEventListener('input', applyFilter);
+
+  function applyFilter() {
+    const q = filterInput.value.trim().toLowerCase();
+    let visible = 0;
+
+    rows.forEach((row, i) => {
+      const name = row.dataset.name;
+      const match = !q || name.includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) {
+        visible++;
+        updateHighlight(i, q);
+      }
+    });
+
+    if (q) {
+      filterCount.textContent = `${total} 件中 ${visible} 件を表示`;
+    } else {
+      filterCount.textContent = '';
+    }
+    noResults.style.display = (q && visible === 0) ? 'block' : 'none';
+  }
+
+  function updateHighlight(i, q) {
+    const { cell, link, text } = originalNames[i];
+    if (!q) {
+      if (link) link.textContent = text;
+      else cell.textContent = text;
+      return;
+    }
+    const idx = text.toLowerCase().indexOf(q);
+    if (idx < 0) {
+      if (link) link.textContent = text;
+      else cell.textContent = text;
+      return;
+    }
+    const highlighted =
+      esc(text.slice(0, idx)) +
+      '<mark>' + esc(text.slice(idx, idx + q.length)) + '</mark>' +
+      esc(text.slice(idx + q.length));
+    if (link) link.innerHTML = highlighted;
+    else cell.innerHTML = highlighted;
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+{% endif %}
 
 </body>
 </html>

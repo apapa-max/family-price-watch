@@ -142,6 +142,11 @@
       font-size: 12px;
       margin-top: 5px;
     }
+    .hint {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 5px;
+    }
 
     /* ── 区切り ── */
     .divider {
@@ -172,6 +177,51 @@
     .btn-primary:hover { opacity: .88; }
     .btn-cancel  { background: #edf2f7; color: #4a5568; }
     .btn-cancel:hover { background: #e2e8f0; }
+
+    /* ── Costco オートコンプリート ── */
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-list {
+      position: absolute;
+      top: calc(100% + 2px);
+      left: 0; right: 0;
+      background: #fff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      max-height: 260px;
+      overflow-y: auto;
+      z-index: 200;
+      display: none;
+    }
+    .autocomplete-list.open { display: block; }
+    .autocomplete-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background .1s;
+    }
+    .autocomplete-item:last-child { border-bottom: none; }
+    .autocomplete-item:hover,
+    .autocomplete-item.active { background: #f0fdf4; }
+    .autocomplete-item .ac-name { font-size: 14px; font-weight: 500; color: #1a1a2e; }
+    .autocomplete-item .ac-url  { font-size: 11px; color: #718096; margin-top: 2px;
+                                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ac-loading {
+      padding: 12px;
+      font-size: 13px;
+      color: #a0aec0;
+      text-align: center;
+    }
+
+    /* 商品番号ステータス */
+    .item-code-status {
+      font-size: 12px;
+      margin-top: 5px;
+      min-height: 18px;
+    }
+    .item-code-status.ok   { color: #276749; }
+    .item-code-status.err  { color: #e53e3e; }
+    .item-code-status.info { color: #718096; }
   </style>
 </head>
 <body>
@@ -191,7 +241,7 @@
       <div class="field">
         <label>サイト <span class="required">必須</span></label>
         <div class="select-wrap">
-          <select name="site" class="{{ 'error' if errors.site }}">
+          <select id="site-select" name="site" class="{{ 'error' if errors.site }}">
             <option value="">-- 選択してください --</option>
             {% set sites = ["Costco", "Amazon", "楽天市場", "Yahoo!ショッピング", "イオン", "その他"] %}
             {% for s in sites %}
@@ -207,22 +257,35 @@
         {% endif %}
       </div>
 
+      <!-- Costco 専用：商品番号 -->
+      <div class="field" id="field-item-code" style="display:none">
+        <label>商品番号（Costco）</label>
+        <input type="text" id="item-code" placeholder="例：1743978"
+               inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+        <p class="item-code-status" id="item-code-status"></p>
+      </div>
+
       <!-- 商品名 -->
       <div class="field">
         <label>商品名 <span class="required">必須</span></label>
-        <input type="text" name="name"
-               value="{{ form_data.get('name', '') }}"
-               placeholder="例：オイコス ストロベリー 12個入り"
-               class="{{ 'error' if errors.name }}">
+        <div class="autocomplete-wrap">
+          <input type="text" id="name-input" name="name"
+                 value="{{ form_data.get('name', '') }}"
+                 placeholder="例：オイコス ストロベリー 12個入り"
+                 class="{{ 'error' if errors.name }}"
+                 autocomplete="off">
+          <div class="autocomplete-list" id="autocomplete-list"></div>
+        </div>
         {% if errors.name %}
           <p class="error-msg">{{ errors.name }}</p>
         {% endif %}
+        <p class="hint" id="name-hint" style="display:none">Costcoを選択すると商品名で候補を検索します</p>
       </div>
 
       <!-- URL -->
       <div class="field">
         <label>商品URL <span class="required">必須</span></label>
-        <input type="url" name="url"
+        <input type="url" id="url-input" name="url"
                value="{{ form_data.get('url', '') }}"
                placeholder="https://..."
                class="{{ 'error' if errors.url }}">
@@ -268,6 +331,146 @@
     </form>
   </div>
 </div>
+
+<script>
+  const siteSelect     = document.getElementById('site-select');
+  const fieldItemCode  = document.getElementById('field-item-code');
+  const itemCodeInput  = document.getElementById('item-code');
+  const itemCodeStatus = document.getElementById('item-code-status');
+  const nameInput      = document.getElementById('name-input');
+  const nameHint       = document.getElementById('name-hint');
+  const urlInput       = document.getElementById('url-input');
+  const acList         = document.getElementById('autocomplete-list');
+
+  // ── サイト選択でCostcoフィールド切り替え ──────────────────────
+  function onSiteChange() {
+    const isCostco = siteSelect.value === 'Costco';
+    fieldItemCode.style.display = isCostco ? '' : 'none';
+    nameHint.style.display      = isCostco ? '' : 'none';
+    if (!isCostco) closeAc();
+  }
+  siteSelect.addEventListener('change', onSiteChange);
+  onSiteChange();
+
+  // ── 商品番号 → URL / 商品名 自動入力 ──────────────────────────
+  let itemTimer = null;
+  itemCodeInput.addEventListener('input', () => {
+    clearTimeout(itemTimer);
+    const code = itemCodeInput.value.trim();
+    if (!code) { setItemStatus('', ''); return; }
+    if (!/^\d{5,}$/.test(code)) {
+      setItemStatus('数字5桁以上で入力してください', 'err');
+      return;
+    }
+    setItemStatus('検索中…', 'info');
+    itemTimer = setTimeout(() => lookupItem(code), 500);
+  });
+
+  async function lookupItem(code) {
+    const fallbackUrl = `https://www.costco.co.jp/ProductPage/${code}`;
+    urlInput.value = fallbackUrl;
+    try {
+      const resp = await fetch(`/api/costco-item?code=${encodeURIComponent(code)}`);
+      const data = await resp.json();
+      if (data.url) urlInput.value = data.url;
+      if (data.name) {
+        nameInput.value = data.name;
+        setItemStatus('商品名とURLを自動入力しました', 'ok');
+      } else {
+        setItemStatus('URLを自動入力しました（商品名は手動入力）', 'info');
+      }
+    } catch {
+      setItemStatus('URLを自動入力しました（商品名は手動入力）', 'info');
+    }
+  }
+
+  function setItemStatus(msg, cls) {
+    itemCodeStatus.textContent = msg;
+    itemCodeStatus.className = 'item-code-status' + (cls ? ' ' + cls : '');
+  }
+
+  // ── 商品名オートコンプリート（Costco のみ） ───────────────────
+  let acTimer = null;
+  let acActive = -1;
+
+  nameInput.addEventListener('input', () => {
+    if (siteSelect.value !== 'Costco') return;
+    clearTimeout(acTimer);
+    const q = nameInput.value.trim();
+    if (q.length < 2) { closeAc(); return; }
+    acTimer = setTimeout(() => fetchSuggestions(q), 380);
+  });
+
+  nameInput.addEventListener('keydown', e => {
+    const items = acList.querySelectorAll('.autocomplete-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acActive = Math.min(acActive + 1, items.length - 1);
+      highlightAc(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acActive = Math.max(acActive - 1, -1);
+      highlightAc(items);
+    } else if (e.key === 'Enter' && acActive >= 0) {
+      e.preventDefault();
+      items[acActive].click();
+    } else if (e.key === 'Escape') {
+      closeAc();
+    }
+  });
+
+  function highlightAc(items) {
+    items.forEach((el, i) => el.classList.toggle('active', i === acActive));
+  }
+
+  async function fetchSuggestions(q) {
+    acList.innerHTML = '<div class="ac-loading">検索中…</div>';
+    acList.classList.add('open');
+    try {
+      const resp = await fetch(`/api/costco-search?q=${encodeURIComponent(q)}`);
+      const results = await resp.json();
+      renderAc(results);
+    } catch {
+      closeAc();
+    }
+  }
+
+  function renderAc(results) {
+    acList.innerHTML = '';
+    acActive = -1;
+    if (!results.length) { closeAc(); return; }
+    results.forEach(r => {
+      const el = document.createElement('div');
+      el.className = 'autocomplete-item';
+      el.innerHTML =
+        `<div class="ac-name">${esc(r.name)}</div>` +
+        (r.url ? `<div class="ac-url">${esc(r.url)}</div>` : '');
+      el.addEventListener('mousedown', e => e.preventDefault());
+      el.addEventListener('click', () => {
+        nameInput.value = r.name;
+        if (r.url) urlInput.value = r.url;
+        closeAc();
+      });
+      acList.appendChild(el);
+    });
+    acList.classList.add('open');
+  }
+
+  function closeAc() {
+    acList.classList.remove('open');
+    acList.innerHTML = '';
+    acActive = -1;
+  }
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.autocomplete-wrap')) closeAc();
+  });
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
 
 </body>
 </html>
