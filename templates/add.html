@@ -222,6 +222,12 @@
     .item-code-status.ok   { color: #276749; }
     .item-code-status.err  { color: #e53e3e; }
     .item-code-status.info { color: #718096; }
+
+    label .optional {
+      color: #718096;
+      margin-left: 4px;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
@@ -260,14 +266,16 @@
       <!-- Costco 専用：商品番号 -->
       <div class="field" id="field-item-code" style="display:none">
         <label>商品番号（Costco）</label>
-        <input type="text" id="item-code" placeholder="例：1743978"
+        <input type="text" id="item-code" name="item_code"
+               value="{{ form_data.get('item_code', '') }}"
+               placeholder="例：1743978"
                inputmode="numeric" pattern="[0-9]*" autocomplete="off">
         <p class="item-code-status" id="item-code-status"></p>
       </div>
 
       <!-- 商品名 -->
       <div class="field">
-        <label>商品名 <span class="required">必須</span></label>
+        <label>商品名 <span class="required" id="name-required">必須</span></label>
         <div class="autocomplete-wrap">
           <input type="text" id="name-input" name="name"
                  value="{{ form_data.get('name', '') }}"
@@ -284,7 +292,7 @@
 
       <!-- URL -->
       <div class="field">
-        <label>商品URL <span class="required">必須</span></label>
+        <label>商品URL <span class="required" id="url-required">必須</span></label>
         <input type="url" id="url-input" name="url"
                value="{{ form_data.get('url', '') }}"
                placeholder="https://..."
@@ -342,12 +350,33 @@
   const urlInput       = document.getElementById('url-input');
   const acList         = document.getElementById('autocomplete-list');
 
+  const nameRequired = document.getElementById('name-required');
+  const urlRequired  = document.getElementById('url-required');
+
+  function isCostcoWithCode() {
+    return siteSelect.value === 'Costco' && /^\d{5,}$/.test(itemCodeInput.value.trim());
+  }
+
+  function updateRequiredBadges() {
+    const optional = isCostcoWithCode();
+    [nameRequired, urlRequired].forEach(el => {
+      if (optional) {
+        el.textContent = '任意';
+        el.className = 'optional';
+      } else {
+        el.textContent = '必須';
+        el.className = 'required';
+      }
+    });
+  }
+
   // ── サイト選択でCostcoフィールド切り替え ──────────────────────
   function onSiteChange() {
     const isCostco = siteSelect.value === 'Costco';
     fieldItemCode.style.display = isCostco ? '' : 'none';
     nameHint.style.display      = isCostco ? '' : 'none';
     if (!isCostco) closeAc();
+    updateRequiredBadges();
   }
   siteSelect.addEventListener('change', onSiteChange);
   onSiteChange();
@@ -357,6 +386,7 @@
   itemCodeInput.addEventListener('input', () => {
     clearTimeout(itemTimer);
     const code = itemCodeInput.value.trim();
+    updateRequiredBadges();
     if (!code) { setItemStatus('', ''); return; }
     if (!/^\d{5,}$/.test(code)) {
       setItemStatus('数字5桁以上で入力してください', 'err');

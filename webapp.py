@@ -32,16 +32,22 @@ def add():
         site        = request.form.get("site", "").strip()
         name        = request.form.get("name", "").strip()
         url         = request.form.get("url", "").strip()
+        item_code   = request.form.get("item_code", "").strip()
         target_price = request.form.get("target_price", "").strip()
         created_by  = request.form.get("created_by", "").strip()
+
+        costco_with_code = site == "Costco" and item_code.isdigit() and len(item_code) >= 5
 
         # --- バリデーション ---
         if not site:
             errors["site"] = "サイトを選択してください"
-        if not name:
+        if not name and not costco_with_code:
             errors["name"] = "商品名を入力してください"
         if not url:
-            errors["url"] = "URLを入力してください"
+            if costco_with_code:
+                url = f"https://www.costco.co.jp/ProductPage/{item_code}"
+            else:
+                errors["url"] = "URLを入力してください"
         if not target_price:
             errors["target_price"] = "目標価格を入力してください"
         else:
