@@ -45,7 +45,7 @@ def add():
             errors["name"] = "商品名を入力してください"
         if not url:
             if costco_with_code:
-                url = f"https://www.costco.co.jp/ProductPage/{item_code}"
+                url = f"https://www.costco.co.jp/p/{item_code}"
             else:
                 errors["url"] = "URLを入力してください"
         if not target_price:
@@ -61,6 +61,8 @@ def add():
             errors["created_by"] = "追加者を入力してください"
 
         if not errors:
+            if costco_with_code and not name:
+                name = fetch_costco_product_name(item_code)
             now = datetime.now().isoformat()
             conn = get_db()
             conn.execute(
@@ -91,6 +93,22 @@ _COSTCO_HEADERS = {
     ),
     "Accept-Language": "ja-JP,ja;q=0.9",
 }
+
+
+def fetch_costco_product_name(item_code):
+    url = f"https://www.costco.co.jp/p/{item_code}"
+    try:
+        resp = requests.get(url, headers=_COSTCO_HEADERS, timeout=6)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for sel in ["h1.page-title span", "h1.product-name", "h1", "title"]:
+            el = soup.select_one(sel)
+            if el:
+                text = el.get_text(strip=True)
+                if text and "costco" not in text.lower():
+                    return text
+    except Exception:
+        pass
+    return f"Costco商品（商品番号：{item_code}）"
 
 
 @app.route("/api/costco-search")
@@ -124,21 +142,11 @@ def api_costco_item():
     code = request.args.get("code", "").strip()
     if not code or not code.isdigit():
         return jsonify({})
-    url = f"https://www.costco.co.jp/ProductPage/{code}"
-    try:
-        resp = requests.get(url, headers=_COSTCO_HEADERS, timeout=6)
-        soup = BeautifulSoup(resp.text, "html.parser")
+    url = f"https://www.costco.co.jp/p/{code}"
+    name = fetch_costco_product_name(code)
+    if name == f"Costco商品（商品番号：{code}）":
         name = None
-        for sel in ["h1.page-title span", "h1.product-name", "h1", "title"]:
-            el = soup.select_one(sel)
-            if el:
-                text = el.get_text(strip=True)
-                if text and "costco" not in text.lower():
-                    name = text
-                    break
-        return jsonify({"name": name, "url": url})
-    except Exception:
-        return jsonify({"name": None, "url": url})
+    return jsonify({"name": name, "url": url})
 
 
 if __name__ == "__main__":
