@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>商品追加 — Family Price Watch</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background: #f5f6f8;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── ヘッダー ── */
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo { font-size: 20px; font-weight: 700; letter-spacing: .02em; }
+    header .logo span { color: #4ade80; }
+    header nav { margin-left: auto; }
+    header nav a {
+      color: #a0aec0;
+      text-decoration: none;
+      font-size: 14px;
+      transition: color .2s;
+    }
+    header nav a:hover { color: #fff; }
+
+    /* ── メインコンテナ ── */
+    .container {
+      max-width: 640px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h1::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 22px;
+      background: #4ade80;
+      border-radius: 2px;
+    }
+
+    /* ── カード ── */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 24px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.07);
+    }
+
+    /* ── フォームフィールド ── */
+    .field { margin-bottom: 20px; }
+    .field:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 6px;
+    }
+    label .required {
+      color: #e53e3e;
+      margin-left: 4px;
+      font-size: 11px;
+    }
+
+    input[type="text"],
+    input[type="url"],
+    input[type="number"],
+    select {
+      width: 100%;
+      height: 42px;
+      padding: 0 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      color: #1a1a2e;
+      background: #fff;
+      transition: border-color .2s, box-shadow .2s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #4ade80;
+      box-shadow: 0 0 0 3px rgba(74,222,128,.15);
+    }
+    input.error, select.error {
+      border-color: #e53e3e;
+    }
+
+    /* select 矢印 */
+    .select-wrap { position: relative; }
+    .select-wrap::after {
+      content: "▾";
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #718096;
+      pointer-events: none;
+      font-size: 13px;
+    }
+
+    /* 金額フィールド */
+    .price-wrap { position: relative; }
+    .price-wrap input { padding-left: 30px; }
+    .price-wrap::before {
+      content: "¥";
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #718096;
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    .error-msg {
+      color: #e53e3e;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    /* ── 区切り ── */
+    .divider {
+      border: none;
+      border-top: 1px solid #f0f0f0;
+      margin: 22px 0;
+    }
+
+    /* ── ボタン ── */
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .btn {
+      flex: 1;
+      height: 44px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: #1a1a2e; color: #fff; }
+    .btn-primary:hover { opacity: .88; }
+    .btn-cancel  { background: #edf2f7; color: #4a5568; }
+    .btn-cancel:hover { background: #e2e8f0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">Family<span>Price</span>Watch</span>
+  <nav><a href="/">← 一覧に戻る</a></nav>
+</header>
+
+<div class="container">
+  <h1>商品を追加</h1>
+
+  <div class="card">
+    <form method="POST" action="/add">
+
+      <!-- サイト -->
+      <div class="field">
+        <label>サイト <span class="required">必須</span></label>
+        <div class="select-wrap">
+          <select name="site" class="{{ 'error' if errors.site }}">
+            <option value="">-- 選択してください --</option>
+            {% set sites = ["Costco", "Amazon", "楽天市場", "Yahoo!ショッピング", "イオン", "その他"] %}
+            {% for s in sites %}
+              <option value="{{ s }}"
+                {% if form_data.get('site') == s %}selected{% endif %}>
+                {{ s }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% if errors.site %}
+          <p class="error-msg">{{ errors.site }}</p>
+        {% endif %}
+      </div>
+
+      <!-- 商品名 -->
+      <div class="field">
+        <label>商品名 <span class="required">必須</span></label>
+        <input type="text" name="name"
+               value="{{ form_data.get('name', '') }}"
+               placeholder="例：オイコス ストロベリー 12個入り"
+               class="{{ 'error' if errors.name }}">
+        {% if errors.name %}
+          <p class="error-msg">{{ errors.name }}</p>
+        {% endif %}
+      </div>
+
+      <!-- URL -->
+      <div class="field">
+        <label>商品URL <span class="required">必須</span></label>
+        <input type="url" name="url"
+               value="{{ form_data.get('url', '') }}"
+               placeholder="https://..."
+               class="{{ 'error' if errors.url }}">
+        {% if errors.url %}
+          <p class="error-msg">{{ errors.url }}</p>
+        {% endif %}
+      </div>
+
+      <hr class="divider">
+
+      <!-- 目標価格 -->
+      <div class="field">
+        <label>目標価格（円） <span class="required">必須</span></label>
+        <div class="price-wrap">
+          <input type="number" name="target_price" min="1"
+                 value="{{ form_data.get('target_price', '') }}"
+                 placeholder="例：1980"
+                 class="{{ 'error' if errors.target_price }}">
+        </div>
+        {% if errors.target_price %}
+          <p class="error-msg">{{ errors.target_price }}</p>
+        {% endif %}
+      </div>
+
+      <!-- 追加者 -->
+      <div class="field">
+        <label>追加者 <span class="required">必須</span></label>
+        <input type="text" name="created_by"
+               value="{{ form_data.get('created_by', '') }}"
+               placeholder="例：パパ / ママ"
+               class="{{ 'error' if errors.created_by }}">
+        {% if errors.created_by %}
+          <p class="error-msg">{{ errors.created_by }}</p>
+        {% endif %}
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn btn-cancel"
+                onclick="location.href='/'">キャンセル</button>
+        <button type="submit" class="btn btn-primary">登録する</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+</body>
+</html>
