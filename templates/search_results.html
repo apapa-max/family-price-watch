@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Costco検索</title>
+</head>
+<body>
+    <h1>Costco商品検索</h1>
+
+    <form method="GET" action="/search/costco">
+        <input type="text" name="q" placeholder="商品名を入力" value="{{ keyword }}">
+        <button type="submit">検索</button>
+    </form>
+
+    <hr>
+
+    {% if keyword %}
+        <h2>「{{ keyword }}」の検索結果</h2>
+
+        {% if results %}
+            <ul>
+                {% for item in results %}
+                    <li>
+                        <strong>{{ item.name }}</strong><br>
+                        <a href="{{ item.url }}" target="_blank">{{ item.url }}</a>
+
+                        <form method="POST" action="/add-from-search">
+                            <input type="hidden" name="site" value="costco">
+                            <input type="hidden" name="name" value="{{ item.name }}">
+                            <input type="hidden" name="url" value="{{ item.url }}">
+
+                            <div>
+                                <label>目標価格:</label>
+                                <input type="number" name="target_price" required>
+                            </div>
+
+                            <div>
+                                <label>追加者:</label>
+                                <input type="text" name="created_by" required>
+                            </div>
+
+                            <button type="submit">この商品を登録</button>
+                        </form>
+                    </li>
+                    <hr>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>候補が見つかりませんでした</p>
+        {% endif %}
+    {% endif %}
+
+    <p><a href="/">一覧へ戻る</a></p>
+</body>
+</html>
