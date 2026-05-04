@@ -62,10 +62,21 @@
       border-radius: 12px;
       padding: 28px 24px;
       box-shadow: 0 1px 6px rgba(0,0,0,.07);
+      margin-bottom: 16px;
+    }
+    .card:last-child { margin-bottom: 0; }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #a0aec0;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 18px;
     }
 
     .field { margin-bottom: 20px; }
-    .field:last-child { margin-bottom: 0; }
+    .field:last-of-type { margin-bottom: 0; }
 
     label {
       display: block;
@@ -81,9 +92,7 @@
     }
 
     input[type="text"],
-    input[type="url"],
-    input[type="number"],
-    select {
+    input[type="number"] {
       width: 100%;
       height: 42px;
       padding: 0 12px;
@@ -97,24 +106,12 @@
       appearance: none;
       -webkit-appearance: none;
     }
-    input:focus, select:focus {
+    input:focus {
       outline: none;
       border-color: #4ade80;
       box-shadow: 0 0 0 3px rgba(74,222,128,.15);
     }
-    input.error, select.error { border-color: #e53e3e; }
-
-    .select-wrap { position: relative; }
-    .select-wrap::after {
-      content: "▾";
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #718096;
-      pointer-events: none;
-      font-size: 13px;
-    }
+    input.error { border-color: #e53e3e; }
 
     .price-wrap { position: relative; }
     .price-wrap input { padding-left: 30px; }
@@ -133,12 +130,6 @@
       color: #e53e3e;
       font-size: 12px;
       margin-top: 5px;
-    }
-
-    .divider {
-      border: none;
-      border-top: 1px solid #f0f0f0;
-      margin: 22px 0;
     }
 
     .btn-row {
@@ -162,6 +153,56 @@
     .btn-primary:hover { opacity: .88; }
     .btn-cancel  { background: #edf2f7; color: #4a5568; }
     .btn-cancel:hover { background: #e2e8f0; }
+
+    /* 読み取り専用情報 */
+    .info-grid {
+      display: grid;
+      gap: 0;
+    }
+    .info-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 11px 0;
+      border-bottom: 1px solid #f0f2f5;
+      gap: 12px;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label {
+      font-size: 13px;
+      color: #718096;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .info-value {
+      font-size: 14px;
+      color: #1a1a2e;
+      font-weight: 500;
+      text-align: right;
+    }
+    .info-value.none { color: #cbd5e0; font-weight: 400; }
+    .info-value.price { font-weight: 700; color: #276749; }
+    .info-value.sale  { font-weight: 700; color: #c53030; }
+
+    /* 削除カード */
+    .card-danger {
+      border: 1px solid #fed7d7;
+    }
+    .card-danger .card-title { color: #c53030; }
+    .btn-delete-full {
+      width: 100%;
+      height: 44px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      background: #fff5f5;
+      color: #c53030;
+      transition: background .15s;
+    }
+    .btn-delete-full:hover { background: #fed7d7; }
   </style>
 </head>
 <body>
@@ -174,30 +215,11 @@
 <div class="container">
   <h1>商品を編集</h1>
 
+  <!-- 編集フォーム -->
   <div class="card">
+    <p class="card-title">編集</p>
     <form method="POST" action="/edit/{{ product.id }}">
 
-      <!-- サイト -->
-      <div class="field">
-        <label>サイト <span class="required">必須</span></label>
-        <div class="select-wrap">
-          <select name="site" class="{{ 'error' if errors.site }}">
-            <option value="">-- 選択してください --</option>
-            {% set sites = ["Costco", "Amazon", "楽天市場", "Yahoo!ショッピング", "イオン", "その他"] %}
-            {% for s in sites %}
-              <option value="{{ s }}"
-                {% if form_data.get('site') == s %}selected{% endif %}>
-                {{ s }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-        {% if errors.site %}
-          <p class="error-msg">{{ errors.site }}</p>
-        {% endif %}
-      </div>
-
-      <!-- 商品名 -->
       <div class="field">
         <label>商品名 <span class="required">必須</span></label>
         <input type="text" name="name"
@@ -208,20 +230,6 @@
         {% endif %}
       </div>
 
-      <!-- URL -->
-      <div class="field">
-        <label>商品URL <span class="required">必須</span></label>
-        <input type="url" name="url"
-               value="{{ form_data.get('url', '') }}"
-               class="{{ 'error' if errors.url }}">
-        {% if errors.url %}
-          <p class="error-msg">{{ errors.url }}</p>
-        {% endif %}
-      </div>
-
-      <hr class="divider">
-
-      <!-- 目標価格 -->
       <div class="field">
         <label>目標価格（円） <span class="required">必須</span></label>
         <div class="price-wrap">
@@ -234,17 +242,6 @@
         {% endif %}
       </div>
 
-      <!-- 追加者 -->
-      <div class="field">
-        <label>追加者 <span class="required">必須</span></label>
-        <input type="text" name="created_by"
-               value="{{ form_data.get('created_by', '') }}"
-               class="{{ 'error' if errors.created_by }}">
-        {% if errors.created_by %}
-          <p class="error-msg">{{ errors.created_by }}</p>
-        {% endif %}
-      </div>
-
       <div class="btn-row">
         <button type="button" class="btn btn-cancel"
                 onclick="location.href='/'">キャンセル</button>
@@ -253,6 +250,79 @@
 
     </form>
   </div>
+
+  <!-- 読み取り専用情報 -->
+  <div class="card">
+    <p class="card-title">商品情報</p>
+    <div class="info-grid">
+      <div class="info-row">
+        <span class="info-label">現在価格</span>
+        {% if product.current_price %}
+          <span class="info-value price">¥{{ "{:,}".format(product.current_price | int) }}</span>
+        {% else %}
+          <span class="info-value none">未取得</span>
+        {% endif %}
+      </div>
+      <div class="info-row">
+        <span class="info-label">標準価格</span>
+        {% if product.base_price %}
+          <span class="info-value">¥{{ "{:,}".format(product.base_price | int) }}</span>
+        {% else %}
+          <span class="info-value none">未取得</span>
+        {% endif %}
+      </div>
+      <div class="info-row">
+        <span class="info-label">セール期間</span>
+        {% if product.sale_end_date %}
+          <span class="info-value sale">〜 {{ product.sale_end_date }}</span>
+        {% else %}
+          <span class="info-value none">—</span>
+        {% endif %}
+      </div>
+      <div class="info-row">
+        <span class="info-label">在庫数</span>
+        {% if product.stock_level is not none and product.stock_level != '' %}
+          <span class="info-value">{{ product.stock_level }}</span>
+        {% else %}
+          <span class="info-value none">未取得</span>
+        {% endif %}
+      </div>
+      <div class="info-row">
+        <span class="info-label">在庫状況</span>
+        {% if product.stock_level_status %}
+          <span class="info-value">{{ product.stock_level_status }}</span>
+        {% else %}
+          <span class="info-value none">未取得</span>
+        {% endif %}
+      </div>
+      <div class="info-row">
+        <span class="info-label">最小注文数</span>
+        {% if product.min_order_quantity %}
+          <span class="info-value">{{ product.min_order_quantity }}</span>
+        {% else %}
+          <span class="info-value none">未取得</span>
+        {% endif %}
+      </div>
+      <div class="info-row">
+        <span class="info-label">最終更新日時</span>
+        {% if product.last_checked %}
+          <span class="info-value">{{ product.last_checked[:16] }}</span>
+        {% else %}
+          <span class="info-value none">未取得</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 削除 -->
+  <div class="card card-danger">
+    <p class="card-title">削除</p>
+    <form method="POST" action="/delete/{{ product.id }}"
+          onsubmit="return confirm('「{{ product.name }}」を削除しますか？')">
+      <button type="submit" class="btn-delete-full">この商品を削除する</button>
+    </form>
+  </div>
+
 </div>
 
 </body>

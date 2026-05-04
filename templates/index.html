@@ -186,15 +186,15 @@
     }
     .price-none { color: #cbd5e0; font-size: 13px; }
     .price-date { color: #a0aec0; font-size: 11px; display: block; margin-top: 2px; }
-    .badge-achieved {
+    .badge-sale {
       display: inline-block;
       margin-left: 6px;
       padding: 1px 6px;
       border-radius: 4px;
       font-size: 10px;
       font-weight: 700;
-      background: #c6f6d5;
-      color: #276749;
+      background: #fed7d7;
+      color: #c53030;
       vertical-align: middle;
     }
 
@@ -206,7 +206,7 @@
       display: flex;
       gap: 6px;
     }
-    .btn-edit, .btn-delete {
+    .btn-edit {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -220,17 +220,10 @@
       border: none;
       text-decoration: none;
       transition: opacity .15s;
-    }
-    .btn-edit {
       background: #edf2f7;
       color: #4a5568;
     }
     .btn-edit:hover { background: #e2e8f0; }
-    .btn-delete {
-      background: #fff5f5;
-      color: #c53030;
-    }
-    .btn-delete:hover { background: #fed7d7; }
 
     /* 空状態 */
     .empty {
@@ -338,8 +331,8 @@
         <tr>
           <th>サイト</th>
           <th>商品名</th>
-          <th>現在価格</th>
           <th>標準価格</th>
+          <th>現在価格</th>
           <th>追加者</th>
           <th></th>
         </tr>
@@ -366,12 +359,20 @@
               {{ p.name }}
             {% endif %}
           </td>
+          <td data-label="標準価格">
+            {% if p.base_price %}
+              <span class="price-target">¥{{ "{:,}".format(p.base_price | int) }}</span>
+            {% else %}
+              <span class="price-none">未取得</span>
+            {% endif %}
+          </td>
           <td data-label="現在価格">
             {% if p.current_price %}
               {% set achieved = p.current_price <= p.target_price %}
+              {% set on_sale = p.base_price and p.current_price < p.base_price %}
               <span class="price-current{% if achieved %} achieved{% endif %}">
                 ¥{{ "{:,}".format(p.current_price | int) }}
-                {% if achieved %}<span class="badge-achieved">達成!</span>{% endif %}
+                {% if on_sale %}<span class="badge-sale">SALE</span>{% endif %}
               </span>
               {% if p.last_checked %}
                 <span class="price-date">{{ p.last_checked[:16] }}</span>
@@ -380,19 +381,12 @@
               <span class="price-none">未取得</span>
             {% endif %}
           </td>
-          <td data-label="標準価格">
-            <span class="price-target">¥{{ "{:,}".format(p.target_price) }}</span>
-          </td>
           <td data-label="追加者">
             <span class="creator">{{ p.created_by }}</span>
           </td>
           <td data-label="">
             <div class="action-btns">
               <a href="/edit/{{ p.id }}" class="btn-edit">編集</a>
-              <form method="POST" action="/delete/{{ p.id }}"
-                    onsubmit="return confirm('「{{ p.name }}」を削除しますか？')">
-                <button type="submit" class="btn-delete">削除</button>
-              </form>
             </div>
           </td>
         </tr>

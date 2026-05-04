@@ -47,6 +47,9 @@ def init_db():
         "ALTER TABLE products ADD COLUMN sale_end_date TEXT",
         "ALTER TABLE products ADD COLUMN is_sale_notified INTEGER DEFAULT 0",
         "ALTER TABLE products ADD COLUMN is_stock_notified INTEGER DEFAULT 0",
+        "ALTER TABLE products ADD COLUMN stock_level INTEGER",
+        "ALTER TABLE products ADD COLUMN stock_level_status TEXT",
+        "ALTER TABLE products ADD COLUMN min_order_quantity INTEGER",
     ]:
         try:
             conn.execute(col_def)
@@ -166,19 +169,12 @@ def edit(product_id):
         return redirect(url_for("index"))
 
     if request.method == "POST":
-        site         = request.form.get("site", "").strip()
         name         = request.form.get("name", "").strip()
-        url          = request.form.get("url", "").strip()
         target_price = request.form.get("target_price", "").strip()
-        created_by   = request.form.get("created_by", "").strip()
 
         errors = {}
-        if not site:
-            errors["site"] = "サイトを選択してください"
         if not name:
             errors["name"] = "商品名を入力してください"
-        if not url:
-            errors["url"] = "URLを入力してください"
         if not target_price:
             errors["target_price"] = "目標価格を入力してください"
         else:
@@ -192,10 +188,8 @@ def edit(product_id):
         if not errors:
             now = datetime.now().isoformat()
             conn.execute(
-                """UPDATE products
-                   SET site=?, name=?, url=?, target_price=?, created_by=?, updated_at=?
-                   WHERE id=?""",
-                (site, name, url, target_price, created_by, now, product_id),
+                "UPDATE products SET name=?, target_price=?, updated_at=? WHERE id=?",
+                (name, target_price, now, product_id),
             )
             conn.commit()
             conn.close()
