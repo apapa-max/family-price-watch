@@ -32,8 +32,8 @@ def notify_sale(product_name: str, data: dict) -> None:
     ]
     if data.get("coupon_discount"):
         lines.append(f"割引額: ¥{int(data['coupon_discount']):,}")
-    start = data.get("sale_start_date") or ""
-    end = data.get("sale_end_date") or ""
+    start = (data.get("sale_start_date") or "")[:10]
+    end = (data.get("sale_end_date") or "")[:10]
     if start or end:
         lines.append(f"セール期間: {start} 〜 {end}")
     if data.get("stock_level") is not None:

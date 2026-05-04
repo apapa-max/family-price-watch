@@ -157,6 +157,69 @@ def fetch_costco_product_name(item_code):
     return f"Costco商品（商品番号：{item_code}）"
 
 
+@app.route("/edit/<int:product_id>", methods=["GET", "POST"])
+def edit(product_id):
+    conn = get_db()
+    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+    if not product:
+        conn.close()
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        site         = request.form.get("site", "").strip()
+        name         = request.form.get("name", "").strip()
+        url          = request.form.get("url", "").strip()
+        target_price = request.form.get("target_price", "").strip()
+        created_by   = request.form.get("created_by", "").strip()
+
+        errors = {}
+        if not site:
+            errors["site"] = "サイトを選択してください"
+        if not name:
+            errors["name"] = "商品名を入力してください"
+        if not url:
+            errors["url"] = "URLを入力してください"
+        if not target_price:
+            errors["target_price"] = "目標価格を入力してください"
+        else:
+            try:
+                target_price = int(target_price)
+                if target_price <= 0:
+                    errors["target_price"] = "1以上の金額を入力してください"
+            except ValueError:
+                errors["target_price"] = "数字で入力してください"
+
+        if not errors:
+            now = datetime.now().isoformat()
+            conn.execute(
+                """UPDATE products
+                   SET site=?, name=?, url=?, target_price=?, created_by=?, updated_at=?
+                   WHERE id=?""",
+                (site, name, url, target_price, created_by, now, product_id),
+            )
+            conn.commit()
+            conn.close()
+            return redirect(url_for("index"))
+
+        conn.close()
+        return render_template("edit.html", product=product, errors=errors, form_data=request.form)
+
+    conn.close()
+    return render_template("edit.html", product=product, errors={}, form_data=dict(product))
+
+
+@app.route("/delete/<int:product_id>", methods=["POST"])
+def delete(product_id):
+    conn = get_db()
+    conn.execute(
+        "UPDATE products SET is_active = 0, updated_at = ? WHERE id = ?",
+        (datetime.now().isoformat(), product_id),
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for("index"))
+
+
 @app.route("/api/costco-search")
 def api_costco_search():
     q = request.args.get("q", "").strip()

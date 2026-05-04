@@ -28,7 +28,7 @@
 
     /* ── コンテナ ── */
     .container {
-      max-width: 800px;
+      max-width: 900px;
       margin: 32px auto;
       padding: 0 16px;
     }
@@ -70,6 +70,7 @@
       border-radius: 8px;
       text-decoration: none;
       transition: opacity .15s, transform .1s;
+      white-space: nowrap;
     }
     .btn-add:hover   { opacity: .85; }
     .btn-add:active  { transform: scale(.97); }
@@ -163,7 +164,6 @@
     }
     .product-link:hover { text-decoration: underline; color: #2b6cb0; }
 
-    /* ハイライト */
     mark {
       background: #fef08a;
       color: inherit;
@@ -180,10 +180,57 @@
       color: #718096;
       font-size: 13px;
     }
+    .price-current.achieved {
+      color: #276749;
+      font-weight: 700;
+    }
     .price-none { color: #cbd5e0; font-size: 13px; }
+    .price-date { color: #a0aec0; font-size: 11px; display: block; margin-top: 2px; }
+    .badge-achieved {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      background: #c6f6d5;
+      color: #276749;
+      vertical-align: middle;
+    }
 
     /* 追加者 */
     .creator { color: #718096; font-size: 13px; }
+
+    /* 操作ボタン */
+    .action-btns {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-edit, .btn-delete {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: opacity .15s;
+    }
+    .btn-edit {
+      background: #edf2f7;
+      color: #4a5568;
+    }
+    .btn-edit:hover { background: #e2e8f0; }
+    .btn-delete {
+      background: #fff5f5;
+      color: #c53030;
+    }
+    .btn-delete:hover { background: #fed7d7; }
 
     /* 空状態 */
     .empty {
@@ -206,6 +253,56 @@
       color: #a0aec0;
       font-size: 14px;
       display: none;
+    }
+
+    /* ── モバイル対応 (640px以下) ── */
+    @media (max-width: 640px) {
+      .container { margin: 16px auto; }
+
+      h1 { font-size: 16px; }
+
+      .table-wrap {
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+      }
+
+      table, thead, tbody, tr, th, td { display: block; }
+
+      thead { display: none; }
+
+      tbody tr {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.07);
+        margin-bottom: 12px;
+        padding: 4px 0;
+        border-bottom: none;
+      }
+      tbody tr:last-child { margin-bottom: 0; }
+
+      td {
+        display: flex;
+        align-items: center;
+        padding: 10px 14px;
+        border-bottom: 1px solid #f0f2f5;
+        gap: 8px;
+      }
+      td:last-child { border-bottom: none; }
+
+      td::before {
+        content: attr(data-label);
+        font-size: 11px;
+        color: #a0aec0;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        flex-shrink: 0;
+        width: 64px;
+      }
+      td[data-label=""]::before { display: none; }
+
+      .action-btns { flex: 1; justify-content: flex-end; }
     }
   </style>
 </head>
@@ -242,14 +339,15 @@
           <th>サイト</th>
           <th>商品名</th>
           <th>現在価格</th>
-          <th>目標価格</th>
+          <th>標準価格</th>
           <th>追加者</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="product-tbody">
         {% for p in products %}
         <tr data-name="{{ p.name | lower }}">
-          <td>
+          <td data-label="サイト">
             {% set site_lower = p.site | lower %}
             {% if "costco" in site_lower %}
               <span class="badge badge-costco">{{ p.site }}</span>
@@ -261,25 +359,41 @@
               <span class="badge">{{ p.site }}</span>
             {% endif %}
           </td>
-          <td class="name-cell">
+          <td data-label="商品名" class="name-cell">
             {% if p.url %}
               <a href="{{ p.url }}" target="_blank" class="product-link">{{ p.name }}</a>
             {% else %}
               {{ p.name }}
             {% endif %}
           </td>
-          <td>
+          <td data-label="現在価格">
             {% if p.current_price %}
-              <span class="price-current">¥{{ "{:,}".format(p.current_price) }}</span>
+              {% set achieved = p.current_price <= p.target_price %}
+              <span class="price-current{% if achieved %} achieved{% endif %}">
+                ¥{{ "{:,}".format(p.current_price | int) }}
+                {% if achieved %}<span class="badge-achieved">達成!</span>{% endif %}
+              </span>
+              {% if p.last_checked %}
+                <span class="price-date">{{ p.last_checked[:16] }}</span>
+              {% endif %}
             {% else %}
               <span class="price-none">未取得</span>
             {% endif %}
           </td>
-          <td>
+          <td data-label="標準価格">
             <span class="price-target">¥{{ "{:,}".format(p.target_price) }}</span>
           </td>
-          <td>
+          <td data-label="追加者">
             <span class="creator">{{ p.created_by }}</span>
+          </td>
+          <td data-label="">
+            <div class="action-btns">
+              <a href="/edit/{{ p.id }}" class="btn-edit">編集</a>
+              <form method="POST" action="/delete/{{ p.id }}"
+                    onsubmit="return confirm('「{{ p.name }}」を削除しますか？')">
+                <button type="submit" class="btn-delete">削除</button>
+              </form>
+            </div>
           </td>
         </tr>
         {% endfor %}
@@ -303,7 +417,6 @@
   const rows        = Array.from(document.querySelectorAll('#product-tbody tr'));
   const total       = rows.length;
 
-  // 各行の元の商品名テキストを保持（ハイライト再描画用）
   const originalNames = rows.map(r => {
     const cell = r.querySelector('.name-cell');
     const link = cell.querySelector('a');

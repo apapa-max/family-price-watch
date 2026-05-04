@@ -60,7 +60,7 @@ def update_all_prices() -> int:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     products = conn.execute(
-        """SELECT id, name, url, is_sale_notified, is_stock_notified
+        """SELECT id, name, url, target_price, is_sale_notified, is_stock_notified
            FROM products
            WHERE is_active = 1 AND site LIKE '%Costco%'"""
     ).fetchall()
@@ -81,6 +81,7 @@ def update_all_prices() -> int:
         is_sale = base_price is not None and price < base_price
         is_sale_notified = p["is_sale_notified"]
         is_stock_notified = p["is_stock_notified"]
+        new_target = min(p["target_price"], price) if p["target_price"] else price
 
         # セール通知
         if is_sale and not is_sale_notified:
@@ -99,6 +100,7 @@ def update_all_prices() -> int:
         conn.execute(
             """UPDATE products
                SET current_price      = ?,
+                   target_price       = ?,
                    base_price         = ?,
                    sale_end_date      = ?,
                    is_sale_notified   = ?,
@@ -108,6 +110,7 @@ def update_all_prices() -> int:
                WHERE id = ?""",
             (
                 price,
+                new_target,
                 base_price,
                 data["sale_end_date"],
                 is_sale_notified,
