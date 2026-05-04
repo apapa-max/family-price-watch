@@ -1,11 +1,59 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+import os
 import sqlite3
 from datetime import datetime
+
 import requests
+from apscheduler.schedulers.background import BackgroundScheduler
 from bs4 import BeautifulSoup
+from flask import Flask, jsonify, redirect, render_template, request, url_for
+
+from scraper import update_all_prices
 
 app = Flask(__name__)
 DB_PATH = "family_price_watch.db"
+
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS products (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            site         TEXT    NOT NULL,
+            name         TEXT    NOT NULL,
+            url          TEXT,
+            current_price REAL,
+            target_price  REAL,
+            last_checked  TEXT,
+            created_by   TEXT,
+            is_active    INTEGER DEFAULT 1,
+            created_at   TEXT,
+            updated_at   TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS price_history (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            price      REAL    NOT NULL,
+            checked_at TEXT    NOT NULL
+        )
+    """)
+    # 既存DBへの追加カラム（初回のみ実行される）
+    for col_def in [
+        "ALTER TABLE products ADD COLUMN last_checked TEXT",
+        "ALTER TABLE products ADD COLUMN current_price REAL",
+        "ALTER TABLE products ADD COLUMN target_price REAL",
+        "ALTER TABLE products ADD COLUMN base_price REAL",
+        "ALTER TABLE products ADD COLUMN sale_end_date TEXT",
+        "ALTER TABLE products ADD COLUMN is_sale_notified INTEGER DEFAULT 0",
+        "ALTER TABLE products ADD COLUMN is_stock_notified INTEGER DEFAULT 0",
+    ]:
+        try:
+            conn.execute(col_def)
+        except sqlite3.OperationalError:
+            pass
+    conn.commit()
+    conn.close()
 
 
 def get_db():
@@ -29,16 +77,15 @@ def add():
     errors = {}
 
     if request.method == "POST":
-        site        = request.form.get("site", "").strip()
-        name        = request.form.get("name", "").strip()
-        url         = request.form.get("url", "").strip()
-        item_code   = request.form.get("item_code", "").strip()
+        site         = request.form.get("site", "").strip()
+        name         = request.form.get("name", "").strip()
+        url          = request.form.get("url", "").strip()
+        item_code    = request.form.get("item_code", "").strip()
         target_price = request.form.get("target_price", "").strip()
-        created_by  = request.form.get("created_by", "").strip()
+        created_by   = request.form.get("created_by", "").strip()
 
         costco_with_code = site == "Costco" and item_code.isdigit() and len(item_code) >= 5
 
-        # --- バリデーション ---
         if not site:
             errors["site"] = "サイトを選択してください"
         if not name and not costco_with_code:
@@ -78,7 +125,6 @@ def add():
             conn.close()
             return redirect(url_for("index"))
 
-        # エラー時は入力値を保持して再表示
         form_data = request.form
         return render_template("add.html", errors=errors, form_data=form_data)
 
@@ -148,6 +194,20 @@ def api_costco_item():
         name = None
     return jsonify({"name": name, "url": url})
 
+
+@app.route("/api/update-prices", methods=["POST"])
+def api_update_prices():
+    count = update_all_prices()
+    return jsonify({"updated": count})
+
+
+init_db()
+
+# Werkzeugのリローダーが2プロセス起動するのを防ぐ
+if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    _scheduler = BackgroundScheduler(timezone="Asia/Tokyo")
+    _scheduler.add_job(update_all_prices, "cron", hour=9, minute=0)
+    _scheduler.start()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
