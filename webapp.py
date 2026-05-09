@@ -260,11 +260,9 @@ def api_update_prices():
 
 init_db()
 
-# Werkzeugのリローダーが2プロセス起動するのを防ぐ
-if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-    _scheduler = BackgroundScheduler(timezone="Asia/Tokyo")
-    _scheduler.add_job(update_all_prices, "cron", hour=9, minute=0)
-    _scheduler.start()
+_scheduler = BackgroundScheduler(timezone="Asia/Tokyo")
+_scheduler.add_job(update_all_prices, "cron", hour=9, minute=0, misfire_grace_time=600)
+_scheduler.start()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
