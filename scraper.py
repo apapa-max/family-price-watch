@@ -57,7 +57,7 @@ def _extract_item_code(url: str) -> str | None:
 
 def update_all_prices() -> int:
     """アクティブなCostco商品の価格を一括更新。更新件数を返す。"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     products = conn.execute(
         """SELECT id, name, url, target_price, is_sale_notified, is_stock_notified
