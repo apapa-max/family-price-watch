@@ -111,6 +111,7 @@
       color: #a0aec0;
       margin-top: 6px;
     }
+    .mobile-only { display: none; }
 
     /* ── テーブル ── */
     .table-wrap {
@@ -153,6 +154,7 @@
       color: #4a5568;
     }
     .badge-costco  { background: #e9f5ff; color: #1a56db; }
+    .badge-yodobashi { background: #fff1f2; color: #be123c; }
     .badge-amazon  { background: #fff7e6; color: #c05600; }
     .badge-rakuten { background: #fff0f0; color: #c0392b; }
 
@@ -177,8 +179,8 @@
       color: #276749;
     }
     .price-current {
-      color: #718096;
-      font-size: 13px;
+      font-weight: 600;
+      color: #276749;
     }
     .price-current.achieved {
       color: #276749;
@@ -186,6 +188,8 @@
     }
     .price-none { color: #cbd5e0; font-size: 13px; }
     .price-date { color: #a0aec0; font-size: 11px; display: block; margin-top: 2px; }
+    .price-detail { color: #718096; font-size: 12px; display: block; margin-top: 4px; }
+    .sale-end { color: #c53030; font-size: 12px; display: block; margin-top: 3px; }
     .badge-sale {
       display: inline-block;
       margin-left: 6px;
@@ -198,15 +202,29 @@
       vertical-align: middle;
     }
 
-    /* 追加者 */
-    .creator { color: #718096; font-size: 13px; }
+    /* 在庫 */
+    .stock-main { color: #1a1a2e; font-weight: 600; }
+    .stock-status { color: #718096; font-size: 12px; display: block; margin-top: 3px; }
+    .badge-low-stock {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      background: #fef3c7;
+      color: #92400e;
+      vertical-align: middle;
+    }
 
     /* 操作ボタン */
     .action-btns {
       display: flex;
       gap: 6px;
     }
-    .btn-edit {
+    .action-btns form { margin: 0; }
+    .btn-edit,
+    .btn-update {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -220,6 +238,13 @@
       border: none;
       text-decoration: none;
       transition: opacity .15s;
+    }
+    .btn-update {
+      background: #e9f5ff;
+      color: #1a56db;
+    }
+    .btn-update:hover { background: #dbeafe; }
+    .btn-edit {
       background: #edf2f7;
       color: #4a5568;
     }
@@ -275,11 +300,12 @@
       tbody tr:last-child { margin-bottom: 0; }
 
       td {
-        display: flex;
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr);
         align-items: center;
         padding: 10px 14px;
         border-bottom: 1px solid #f0f2f5;
-        gap: 8px;
+        column-gap: 8px;
       }
       td:last-child { border-bottom: none; }
 
@@ -291,9 +317,35 @@
         text-transform: uppercase;
         letter-spacing: .04em;
         flex-shrink: 0;
-        width: 64px;
       }
       td[data-label=""]::before { display: none; }
+
+      .desktop-price-extra { display: none; }
+      .mobile-only { display: grid; }
+
+      td > * {
+        grid-column: 2;
+        min-width: 0;
+      }
+
+      td[data-label=""] {
+        display: flex;
+      }
+
+      td[data-label="現在価格"] {
+        align-items: start;
+      }
+
+      td[data-label="現在価格"] .price-current {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      td[data-label="現在価格"] .badge-sale {
+        margin-left: 0;
+      }
 
       .action-btns { flex: 1; justify-content: flex-end; }
     }
@@ -333,7 +385,7 @@
           <th>商品名</th>
           <th>標準価格</th>
           <th>現在価格</th>
-          <th>追加者</th>
+          <th>在庫</th>
           <th></th>
         </tr>
       </thead>
@@ -344,6 +396,8 @@
             {% set site_lower = p.site | lower %}
             {% if "costco" in site_lower %}
               <span class="badge badge-costco">{{ p.site }}</span>
+            {% elif "ヨドバシ" in p.site or "yodobashi" in site_lower %}
+              <span class="badge badge-yodobashi">{{ p.site }}</span>
             {% elif "amazon" in site_lower %}
               <span class="badge badge-amazon">{{ p.site }}</span>
             {% elif "楽天" in p.site %}
@@ -368,24 +422,84 @@
           </td>
           <td data-label="現在価格">
             {% if p.current_price %}
-              {% set achieved = p.current_price <= p.target_price %}
+              {% set achieved = p.target_price and p.current_price <= p.target_price %}
               {% set on_sale = p.base_price and p.current_price < p.base_price %}
               <span class="price-current{% if achieved %} achieved{% endif %}">
                 ¥{{ "{:,}".format(p.current_price | int) }}
                 {% if on_sale %}<span class="badge-sale">SALE</span>{% endif %}
               </span>
+              <span class="price-detail desktop-price-extra">
+                目標金額:
+                {% if p.target_price %}
+                  ¥{{ "{:,}".format(p.target_price | int) }}
+                {% else %}
+                  未設定
+                {% endif %}
+              </span>
+              {% if on_sale %}
+                <span class="sale-end desktop-price-extra">
+                  セール終了
+                  {% if p.sale_end_date %}
+                    {{ p.sale_end_date[5:10].replace("-", "/") }}
+                  {% else %}
+                    未定
+                  {% endif %}
+                </span>
+              {% endif %}
               {% if p.last_checked %}
-                <span class="price-date">{{ p.last_checked[:16] }}</span>
+                <span class="price-date desktop-price-extra">{{ p.last_checked[:16] }}</span>
               {% endif %}
             {% else %}
               <span class="price-none">未取得</span>
             {% endif %}
           </td>
-          <td data-label="追加者">
-            <span class="creator">{{ p.created_by }}</span>
+          <td data-label="目標金額" class="mobile-only">
+            {% if p.target_price %}
+              <span class="price-target">¥{{ "{:,}".format(p.target_price | int) }}</span>
+            {% else %}
+              <span class="price-none">未設定</span>
+            {% endif %}
+          </td>
+          {% if p.base_price and p.current_price and p.current_price < p.base_price %}
+          <td data-label="セール終了" class="mobile-only">
+            <span class="sale-end">
+              {% if p.sale_end_date %}
+                {{ p.sale_end_date[5:10].replace("-", "/") }}
+              {% else %}
+                未定
+              {% endif %}
+            </span>
+          </td>
+          {% endif %}
+          <td data-label="最終更新" class="mobile-only">
+            {% if p.last_checked %}
+              <span class="price-date">{{ p.last_checked[:16] }}</span>
+            {% else %}
+              <span class="price-none">未取得</span>
+            {% endif %}
+          </td>
+          <td data-label="在庫">
+            {% if p.stock_level is not none and p.stock_level != '' %}
+              <span class="stock-main">
+                {{ p.stock_level }}
+                {% if p.stock_level <= 50 %}
+                  <span class="badge-low-stock">少なめ</span>
+                {% endif %}
+              </span>
+              {% if p.stock_level_status %}
+                <span class="stock-status">{{ p.stock_level_status }}</span>
+              {% endif %}
+            {% elif p.stock_level_status %}
+              <span class="stock-main">{{ p.stock_level_status }}</span>
+            {% else %}
+              <span class="price-none">未取得</span>
+            {% endif %}
           </td>
           <td data-label="">
             <div class="action-btns">
+              <form method="POST" action="/update/{{ p.id }}">
+                <button type="submit" class="btn-update">更新</button>
+              </form>
               <a href="/edit/{{ p.id }}" class="btn-edit">編集</a>
             </div>
           </td>

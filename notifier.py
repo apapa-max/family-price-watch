@@ -46,6 +46,20 @@ def notify_sale(product_name: str, data: dict) -> None:
     _send("\n".join(lines))
 
 
+def notify_target_price(product_name: str, data: dict, target_price) -> None:
+    lines = [
+        f"*目標価格に到達: {product_name}*",
+        f"現在価格: {_format_price(data.get('price'))}",
+        f"目標価格: {_format_price(target_price)}",
+    ]
+    if data.get("stock_level_status"):
+        lines.append(f"在庫状況: {data['stock_level_status']}")
+    if data.get("url"):
+        lines.append(f"商品ページ: {data['url']}")
+    lines.append(f"一覧: {APP_URL}")
+    _send("\n".join(lines))
+
+
 def notify_low_stock(product_name: str, data: dict) -> None:
     lines = [
         f"*在庫わずか: {product_name}*",
@@ -58,5 +72,22 @@ def notify_low_stock(product_name: str, data: dict) -> None:
         lines.append(f"在庫状況: {data['stock_level_status']}")
     if data.get("min_order_quantity") is not None:
         lines.append(f"最小注文数: {data['min_order_quantity']}")
+    lines.append(f"一覧: {APP_URL}")
+    _send("\n".join(lines))
+
+
+def notify_stock_restocked(product_name: str, data: dict) -> None:
+    lines = [
+        f"*在庫復活: {product_name}*",
+        f"現在価格: {_format_price(data.get('price'))}",
+    ]
+    if data.get("base_price"):
+        lines.append(f"標準価格: {_format_price(data.get('base_price'))}")
+    if data.get("stock_level") is not None:
+        lines.append(f"在庫数: {data['stock_level']}")
+    if data.get("stock_level_status"):
+        lines.append(f"在庫状況: {data['stock_level_status']}")
+    if data.get("url"):
+        lines.append(f"商品ページ: {data['url']}")
     lines.append(f"一覧: {APP_URL}")
     _send("\n".join(lines))

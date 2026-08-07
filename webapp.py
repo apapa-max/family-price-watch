@@ -7,10 +7,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
-from scraper import update_all_prices
+from scraper import update_all_prices, update_product_price
 
 app = Flask(__name__)
 DB_PATH = "family_price_watch.db"
+SUPPORTED_SITES = ("Costco", "ヨドバシ.com")
 
 
 def init_db():
@@ -44,6 +45,7 @@ def init_db():
         "ALTER TABLE products ADD COLUMN current_price REAL",
         "ALTER TABLE products ADD COLUMN target_price REAL",
         "ALTER TABLE products ADD COLUMN base_price REAL",
+        "ALTER TABLE products ADD COLUMN coupon_discount REAL",
         "ALTER TABLE products ADD COLUMN sale_end_date TEXT",
         "ALTER TABLE products ADD COLUMN is_sale_notified INTEGER DEFAULT 0",
         "ALTER TABLE products ADD COLUMN is_stock_notified INTEGER DEFAULT 0",
@@ -69,7 +71,10 @@ def get_db():
 def index():
     conn = get_db()
     products = conn.execute(
-        "SELECT * FROM products WHERE is_active = 1 ORDER BY created_at DESC"
+        """SELECT * FROM products
+           WHERE is_active = 1
+             AND (site LIKE '%Costco%' OR site LIKE '%ヨドバシ%' OR site LIKE '%Yodobashi%')
+           ORDER BY created_at DESC"""
     ).fetchall()
     conn.close()
     return render_template("index.html", products=products)
@@ -87,32 +92,46 @@ def add():
         target_price = request.form.get("target_price", "").strip()
         created_by   = request.form.get("created_by", "").strip()
 
-        costco_with_code = site == "Costco" and item_code.isdigit() and len(item_code) >= 5
+        is_costco = site == "Costco"
+        is_yodobashi = site == "ヨドバシ.com"
+        costco_with_code = is_costco and item_code.isdigit() and len(item_code) >= 5
+        yodobashi_with_code = is_yodobashi and item_code.isdigit()
 
         if not site:
             errors["site"] = "サイトを選択してください"
-        if not name and not costco_with_code:
+        elif site not in SUPPORTED_SITES:
+            errors["site"] = "現在取り込めるサイトを選択してください"
+        if is_costco and not costco_with_code:
+            errors["item_code"] = "Costcoの商品番号を数字5桁以上で入力してください"
+        if is_yodobashi and not (yodobashi_with_code or url):
+            errors["item_code"] = "ヨドバシの商品番号か商品URLを入力してください"
+        if not name and not (is_costco or is_yodobashi):
             errors["name"] = "商品名を入力してください"
         if not url:
             if costco_with_code:
                 url = f"https://www.costco.co.jp/p/{item_code}"
-            else:
+            elif yodobashi_with_code:
+                url = f"https://www.yodobashi.com/product/{item_code}/"
+            elif not (is_costco or is_yodobashi):
                 errors["url"] = "URLを入力してください"
-        if not target_price:
-            errors["target_price"] = "目標価格を入力してください"
-        else:
+        if target_price:
             try:
                 target_price = int(target_price)
                 if target_price <= 0:
                     errors["target_price"] = "1以上の金額を入力してください"
             except ValueError:
                 errors["target_price"] = "数字で入力してください"
-        if not created_by:
-            errors["created_by"] = "追加者を入力してください"
+        else:
+            target_price = None
 
         if not errors:
             if costco_with_code and not name:
                 name = fetch_costco_product_name(item_code)
+            if yodobashi_with_code and not name:
+                name = fetch_yodobashi_product_name(item_code)
+            elif is_yodobashi and url and not name:
+                name = fetch_yodobashi_product_name_from_url(url)
+            created_by = created_by or None
             now = datetime.now().isoformat()
             conn = get_db()
             conn.execute(
@@ -160,6 +179,29 @@ def fetch_costco_product_name(item_code):
     return f"Costco商品（商品番号：{item_code}）"
 
 
+def fetch_yodobashi_product_name(item_code):
+    url = f"https://www.yodobashi.com/product/{item_code}/"
+    return fetch_yodobashi_product_name_from_url(
+        url,
+        fallback=f"ヨドバシ商品（商品番号：{item_code}）",
+    )
+
+
+def fetch_yodobashi_product_name_from_url(url, fallback="ヨドバシ商品"):
+    try:
+        resp = requests.get(url, headers=_COSTCO_HEADERS, timeout=6)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for sel in ["h1", ".productName", "#products_maintitle", "title"]:
+            el = soup.select_one(sel)
+            if el:
+                text = el.get_text(" ", strip=True)
+                if text and "ヨドバシ.com" not in text:
+                    return text
+    except Exception:
+        pass
+    return fallback
+
+
 @app.route("/edit/<int:product_id>", methods=["GET", "POST"])
 def edit(product_id):
     conn = get_db()
@@ -175,15 +217,15 @@ def edit(product_id):
         errors = {}
         if not name:
             errors["name"] = "商品名を入力してください"
-        if not target_price:
-            errors["target_price"] = "目標価格を入力してください"
-        else:
+        if target_price:
             try:
                 target_price = int(target_price)
                 if target_price <= 0:
                     errors["target_price"] = "1以上の金額を入力してください"
             except ValueError:
                 errors["target_price"] = "数字で入力してください"
+        else:
+            target_price = None
 
         if not errors:
             now = datetime.now().isoformat()
@@ -211,6 +253,12 @@ def delete(product_id):
     )
     conn.commit()
     conn.close()
+    return redirect(url_for("index"))
+
+
+@app.route("/update/<int:product_id>", methods=["POST"])
+def update_price(product_id):
+    update_product_price(product_id)
     return redirect(url_for("index"))
 
 
@@ -248,6 +296,18 @@ def api_costco_item():
     url = f"https://www.costco.co.jp/p/{code}"
     name = fetch_costco_product_name(code)
     if name == f"Costco商品（商品番号：{code}）":
+        name = None
+    return jsonify({"name": name, "url": url})
+
+
+@app.route("/api/yodobashi-item")
+def api_yodobashi_item():
+    code = request.args.get("code", "").strip()
+    if not code or not code.isdigit():
+        return jsonify({})
+    url = f"https://www.yodobashi.com/product/{code}/"
+    name = fetch_yodobashi_product_name(code)
+    if name == f"ヨドバシ商品（商品番号：{code}）":
         name = None
     return jsonify({"name": name, "url": url})
 

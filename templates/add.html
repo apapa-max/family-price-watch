@@ -228,6 +228,40 @@
       margin-left: 4px;
       font-size: 11px;
     }
+
+    .details-toggle {
+      display: none;
+      width: 100%;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+      color: #1a1a2e;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .details-title {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #4a5568;
+      margin-bottom: 2px;
+    }
+    .details-summary {
+      font-size: 12px;
+      color: #718096;
+    }
+    .details-arrow {
+      color: #718096;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .advanced-fields.collapsed { display: none; }
   </style>
 </head>
 <body>
@@ -249,7 +283,7 @@
         <div class="select-wrap">
           <select id="site-select" name="site" class="{{ 'error' if errors.site }}">
             <option value="">-- 選択してください --</option>
-            {% set sites = ["Costco", "Amazon", "楽天市場", "Yahoo!ショッピング", "イオン", "その他"] %}
+            {% set sites = ["Costco", "ヨドバシ.com"] %}
             {% for s in sites %}
               <option value="{{ s }}"
                 {% if form_data.get('site') == s %}selected{% endif %}>
@@ -263,50 +297,76 @@
         {% endif %}
       </div>
 
-      <!-- Costco 専用：商品番号 -->
+      <!-- 対応サイト専用：商品番号 -->
       <div class="field" id="field-item-code" style="display:none">
-        <label>商品番号（Costco）</label>
+        <label><span id="item-code-label">商品番号</span> <span class="required">必須</span></label>
         <input type="text" id="item-code" name="item_code"
                value="{{ form_data.get('item_code', '') }}"
                placeholder="例：1743978"
-               inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+               inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+               class="{{ 'error' if errors.item_code }}">
+        {% if errors.item_code %}
+          <p class="error-msg">{{ errors.item_code }}</p>
+        {% endif %}
         <p class="item-code-status" id="item-code-status"></p>
       </div>
 
       <!-- 商品名 -->
-      <div class="field">
-        <label>商品名 <span class="required" id="name-required">必須</span></label>
-        <div class="autocomplete-wrap">
-          <input type="text" id="name-input" name="name"
-                 value="{{ form_data.get('name', '') }}"
-                 placeholder="例：オイコス ストロベリー 12個入り"
-                 class="{{ 'error' if errors.name }}"
-                 autocomplete="off">
-          <div class="autocomplete-list" id="autocomplete-list"></div>
-        </div>
-        {% if errors.name %}
-          <p class="error-msg">{{ errors.name }}</p>
-        {% endif %}
-        <p class="hint" id="name-hint" style="display:none">Costcoを選択すると商品名で候補を検索します</p>
-      </div>
+      <button type="button" class="details-toggle" id="details-toggle">
+        <span>
+          <span class="details-title">詳細項目</span>
+          <span class="details-summary">商品名 / 商品URL / 追加者</span>
+        </span>
+        <span class="details-arrow" id="details-arrow">開く ▾</span>
+      </button>
 
-      <!-- URL -->
-      <div class="field">
-        <label>商品URL <span class="required" id="url-required">必須</span></label>
-        <input type="url" id="url-input" name="url"
-               value="{{ form_data.get('url', '') }}"
-               placeholder="https://..."
-               class="{{ 'error' if errors.url }}">
-        {% if errors.url %}
-          <p class="error-msg">{{ errors.url }}</p>
-        {% endif %}
+      <div class="advanced-fields" id="advanced-fields">
+        <div class="field">
+          <label>商品名 <span class="required" id="name-required">必須</span></label>
+          <div class="autocomplete-wrap">
+            <input type="text" id="name-input" name="name"
+                   value="{{ form_data.get('name', '') }}"
+                   placeholder="例：オイコス ストロベリー 12個入り"
+                   class="{{ 'error' if errors.name }}"
+                   autocomplete="off">
+            <div class="autocomplete-list" id="autocomplete-list"></div>
+          </div>
+          {% if errors.name %}
+            <p class="error-msg">{{ errors.name }}</p>
+          {% endif %}
+          <p class="hint" id="name-hint" style="display:none">Costcoを選択すると商品名で候補を検索します</p>
+        </div>
+
+        <!-- URL -->
+        <div class="field">
+          <label>商品URL <span class="required" id="url-required">必須</span></label>
+          <input type="url" id="url-input" name="url"
+                 value="{{ form_data.get('url', '') }}"
+                 placeholder="https://..."
+                 class="{{ 'error' if errors.url }}">
+          {% if errors.url %}
+            <p class="error-msg">{{ errors.url }}</p>
+          {% endif %}
+        </div>
+
+        <!-- 追加者 -->
+        <div class="field">
+          <label>追加者 <span class="optional">任意</span></label>
+          <input type="text" id="created-by-input" name="created_by"
+                 value="{{ form_data.get('created_by', '') }}"
+                 placeholder="例：パパ / ママ"
+                 class="{{ 'error' if errors.created_by }}">
+          {% if errors.created_by %}
+            <p class="error-msg">{{ errors.created_by }}</p>
+          {% endif %}
+        </div>
       </div>
 
       <hr class="divider">
 
       <!-- 目標価格 -->
       <div class="field">
-        <label>目標価格（円） <span class="required">必須</span></label>
+        <label>目標価格（円） <span class="optional">任意</span></label>
         <div class="price-wrap">
           <input type="number" name="target_price" min="1"
                  value="{{ form_data.get('target_price', '') }}"
@@ -315,18 +375,6 @@
         </div>
         {% if errors.target_price %}
           <p class="error-msg">{{ errors.target_price }}</p>
-        {% endif %}
-      </div>
-
-      <!-- 追加者 -->
-      <div class="field">
-        <label>追加者 <span class="required">必須</span></label>
-        <input type="text" name="created_by"
-               value="{{ form_data.get('created_by', '') }}"
-               placeholder="例：パパ / ママ"
-               class="{{ 'error' if errors.created_by }}">
-        {% if errors.created_by %}
-          <p class="error-msg">{{ errors.created_by }}</p>
         {% endif %}
       </div>
 
@@ -348,17 +396,24 @@
   const nameInput      = document.getElementById('name-input');
   const nameHint       = document.getElementById('name-hint');
   const urlInput       = document.getElementById('url-input');
+  const createdByInput = document.getElementById('created-by-input');
   const acList         = document.getElementById('autocomplete-list');
+  const detailsToggle  = document.getElementById('details-toggle');
+  const detailsArrow   = document.getElementById('details-arrow');
+  const advancedFields = document.getElementById('advanced-fields');
+  const itemCodeLabel  = document.getElementById('item-code-label');
 
   const nameRequired = document.getElementById('name-required');
   const urlRequired  = document.getElementById('url-required');
+  const hasAdvancedErrors = {{ 'true' if errors.name or errors.url or errors.created_by else 'false' }};
+  let advancedOpen = hasAdvancedErrors;
 
   function isCostcoWithCode() {
     return siteSelect.value === 'Costco' && /^\d{5,}$/.test(itemCodeInput.value.trim());
   }
 
   function updateRequiredBadges() {
-    const optional = isCostcoWithCode();
+    const optional = siteSelect.value === 'Costco' || siteSelect.value === 'ヨドバシ.com';
     [nameRequired, urlRequired].forEach(el => {
       if (optional) {
         el.textContent = '任意';
@@ -370,15 +425,31 @@
     });
   }
 
+  function updateAdvancedFields() {
+    const canLookupByCode = siteSelect.value === 'Costco' || siteSelect.value === 'ヨドバシ.com';
+    detailsToggle.style.display = canLookupByCode ? 'flex' : 'none';
+    advancedFields.classList.toggle('collapsed', canLookupByCode && !advancedOpen);
+    detailsArrow.textContent = advancedOpen ? '閉じる ▴' : '開く ▾';
+  }
+
   // ── サイト選択でCostcoフィールド切り替え ──────────────────────
   function onSiteChange() {
     const isCostco = siteSelect.value === 'Costco';
-    fieldItemCode.style.display = isCostco ? '' : 'none';
+    const isYodobashi = siteSelect.value === 'ヨドバシ.com';
+    const canLookupByCode = isCostco || isYodobashi;
+    fieldItemCode.style.display = canLookupByCode ? '' : 'none';
+    itemCodeLabel.textContent = isYodobashi ? '商品番号（ヨドバシ）' : '商品番号（Costco）';
+    itemCodeInput.placeholder = isYodobashi ? '例：100000001234567890' : '例：1743978';
     nameHint.style.display      = isCostco ? '' : 'none';
     if (!isCostco) closeAc();
     updateRequiredBadges();
+    updateAdvancedFields();
   }
   siteSelect.addEventListener('change', onSiteChange);
+  detailsToggle.addEventListener('click', () => {
+    advancedOpen = !advancedOpen;
+    updateAdvancedFields();
+  });
   onSiteChange();
 
   // ── 商品番号 → URL / 商品名 自動入力 ──────────────────────────
@@ -388,8 +459,9 @@
     const code = itemCodeInput.value.trim();
     updateRequiredBadges();
     if (!code) { setItemStatus('', ''); return; }
-    if (!/^\d{5,}$/.test(code)) {
-      setItemStatus('数字5桁以上で入力してください', 'err');
+    const minLength = siteSelect.value === 'Costco' ? 5 : 1;
+    if (!new RegExp(`^\\d{${minLength},}$`).test(code)) {
+      setItemStatus(siteSelect.value === 'Costco' ? '数字5桁以上で入力してください' : '数字で入力してください', 'err');
       return;
     }
     setItemStatus('検索中…', 'info');
@@ -397,10 +469,14 @@
   });
 
   async function lookupItem(code) {
-    const fallbackUrl = `https://www.costco.co.jp/ProductPage/${code}`;
+    const isYodobashi = siteSelect.value === 'ヨドバシ.com';
+    const fallbackUrl = isYodobashi
+      ? `https://www.yodobashi.com/product/${code}/`
+      : `https://www.costco.co.jp/ProductPage/${code}`;
+    const endpoint = isYodobashi ? '/api/yodobashi-item' : '/api/costco-item';
     urlInput.value = fallbackUrl;
     try {
-      const resp = await fetch(`/api/costco-item?code=${encodeURIComponent(code)}`);
+      const resp = await fetch(`${endpoint}?code=${encodeURIComponent(code)}`);
       const data = await resp.json();
       if (data.url) urlInput.value = data.url;
       if (data.name) {
