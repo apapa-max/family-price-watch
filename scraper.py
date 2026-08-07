@@ -1,5 +1,7 @@
+import json
 import re
 import sqlite3
+import subprocess
 from datetime import datetime
 
 import requests
@@ -38,6 +40,8 @@ AVAILABLE_STOCK_KEYWORDS = (
     "予約受付中",
 )
 
+YODOBASHI_API_TIMEOUT = 25
+
 
 def fetch_costco_data(item_code: str) -> dict | None:
     """Costco APIから価格・在庫・クーポン情報を取得。失敗時はNoneを返す。"""
@@ -74,6 +78,16 @@ def _parse_yen(text: str) -> int | None:
     return int(m.group(1).replace(",", "")) if m else None
 
 
+def _parse_jsonp(text: str) -> dict | None:
+    m = re.search(r"^[^(]*\((.*)\)\s*;?\s*$", text or "", re.S)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except json.JSONDecodeError:
+        return None
+
+
 def _clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
@@ -99,8 +113,98 @@ def is_yodobashi_available(status: str | None) -> bool:
     return bool(status) and any(keyword in status for keyword in AVAILABLE_STOCK_KEYWORDS)
 
 
+def _extract_yodobashi_item_code(url: str) -> str | None:
+    m = re.search(r"/product/(\d+)", url or "")
+    return m.group(1) if m else None
+
+
+def _fetch_yodobashi_api_text(item_code: str) -> str | None:
+    url = f"https://www.yodobashi.com/ws/api/ec/products-noukikaitou?sku={item_code}"
+    script = """
+const url = process.argv[1];
+const ac = new AbortController();
+const timer = setTimeout(() => ac.abort(), 20000);
+fetch(url, {
+  headers: {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept-Language": "ja-JP,ja;q=0.9"
+  },
+  signal: ac.signal
+}).then(async response => {
+  clearTimeout(timer);
+  if (!response.ok) {
+    console.error(`HTTP ${response.status}`);
+    process.exit(2);
+  }
+  process.stdout.write(await response.text());
+}).catch(error => {
+  clearTimeout(timer);
+  console.error(`${error.name}: ${error.message}`);
+  process.exit(1);
+});
+"""
+    try:
+        result = subprocess.run(
+            ["node", "-e", script, url],
+            capture_output=True,
+            text=True,
+            timeout=YODOBASHI_API_TIMEOUT,
+            check=False,
+        )
+    except Exception as e:
+        print(
+            f"[family-price-watch] Yodobashi API node failed: {url} "
+            f"({type(e).__name__}: {e})",
+            flush=True,
+        )
+        return None
+    if result.returncode != 0:
+        print(
+            f"[family-price-watch] Yodobashi API failed: {url} "
+            f"({result.stderr.strip()})",
+            flush=True,
+        )
+        return None
+    return result.stdout
+
+
+def fetch_yodobashi_api_data(item_code: str) -> dict | None:
+    text = _fetch_yodobashi_api_text(item_code)
+    payload = _parse_jsonp(text or "")
+    if not payload or payload.get("status") != "0":
+        return None
+    items = payload.get("item") or []
+    if not items:
+        return None
+    item = items[0]
+    price = _parse_yen(item.get("salesPrice") or "")
+    if price is None:
+        return None
+    brand_name = _clean_text(item.get("brandName") or "")
+    product_name = _clean_text(item.get("productName") or "")
+    name = " ".join(part for part in [brand_name, product_name] if part)
+    return {
+        "price": price,
+        "base_price": None,
+        "coupon_discount": None,
+        "sale_start_date": None,
+        "sale_end_date": None,
+        "stock_level": None,
+        "stock_level_status": item.get("stockMessage"),
+        "min_order_quantity": None,
+        "name": name or None,
+        "url": f"https://www.yodobashi.com/product/{item_code}/",
+    }
+
+
 def fetch_yodobashi_data(url: str) -> dict | None:
     """ヨドバシの商品ページから価格・在庫文言を取得。失敗時はNoneを返す。"""
+    item_code = _extract_yodobashi_item_code(url)
+    if item_code:
+        api_data = fetch_yodobashi_api_data(item_code)
+        if api_data is not None:
+            return api_data
+
     try:
         resp = requests.get(url, headers=_HEADERS, timeout=(5, 20))
         resp.raise_for_status()

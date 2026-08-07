@@ -7,7 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
-from scraper import update_all_prices, update_product_price
+from scraper import fetch_yodobashi_data, update_all_prices, update_product_price
 
 app = Flask(__name__)
 DB_PATH = "family_price_watch.db"
@@ -212,6 +212,9 @@ def fetch_yodobashi_product_name(item_code):
 
 
 def fetch_yodobashi_product_name_from_url(url, fallback="ヨドバシ商品"):
+    data = fetch_yodobashi_data(url)
+    if data and data.get("name"):
+        return data["name"]
     try:
         resp = requests.get(url, headers=_COSTCO_HEADERS, timeout=6)
         soup = BeautifulSoup(resp.text, "html.parser")
