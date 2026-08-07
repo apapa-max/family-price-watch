@@ -299,6 +299,7 @@ def _update_product(conn, p: sqlite3.Row, now: str) -> bool:
     site = (p["site"] or "").lower()
     price = data["price"]
     base_price = data["base_price"]
+    product_name = data.get("name") or p["name"]
     is_costco = "costco" in site
     if not is_costco:
         history_base = _get_history_max_price(conn, p["id"], price)
@@ -319,9 +320,9 @@ def _update_product(conn, p: sqlite3.Row, now: str) -> bool:
     # セール通知
     if is_sale and not is_sale_notified:
         if is_costco:
-            notify_sale(p["name"], data)
+            notify_sale(product_name, data)
         else:
-            notify_target_price(p["name"], data, p["target_price"])
+            notify_target_price(product_name, data, p["target_price"])
         is_sale_notified = 1
     elif not is_sale and is_sale_notified:
         # 通常価格に戻ったのでフラグをリセット
@@ -336,14 +337,15 @@ def _update_product(conn, p: sqlite3.Row, now: str) -> bool:
         was_unavailable = old_stock_status and not is_yodobashi_available(old_stock_status)
         is_available = is_yodobashi_available(data["stock_level_status"])
         if was_unavailable and is_available and not is_stock_notified:
-            notify_stock_restocked(p["name"], data)
+            notify_stock_restocked(product_name, data)
             is_stock_notified = 1
         elif not is_available:
             is_stock_notified = 0
 
     conn.execute(
         """UPDATE products
-           SET current_price      = ?,
+           SET name               = ?,
+               current_price      = ?,
                target_price       = ?,
                base_price         = ?,
                coupon_discount    = ?,
@@ -357,6 +359,7 @@ def _update_product(conn, p: sqlite3.Row, now: str) -> bool:
                updated_at         = ?
            WHERE id = ?""",
         (
+            product_name,
             price,
             new_target,
             base_price,
