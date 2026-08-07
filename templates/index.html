@@ -113,6 +113,19 @@
     }
     .mobile-only { display: none; }
 
+    .notice {
+      margin-bottom: 16px;
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .notice-success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+    .notice-warning { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+    .notice-error { background: #fff5f5; border-color: #fed7d7; color: #c53030; }
+    .notice-info { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+
     /* ── テーブル ── */
     .table-wrap {
       background: #fff;
@@ -244,6 +257,11 @@
       color: #1a56db;
     }
     .btn-update:hover { background: #dbeafe; }
+    .btn-update:disabled {
+      background: #edf2f7;
+      color: #a0aec0;
+      cursor: wait;
+    }
     .btn-edit {
       background: #edf2f7;
       color: #4a5568;
@@ -362,6 +380,10 @@
     <h1>監視商品一覧</h1>
     <a href="/add" class="btn-add">商品を追加</a>
   </div>
+
+  {% if notice %}
+    <div class="notice notice-{{ notice_type }}">{{ notice }}</div>
+  {% endif %}
 
   {% if products %}
   <!-- 絞り込み検索バー -->
@@ -497,7 +519,7 @@
           </td>
           <td data-label="">
             <div class="action-btns">
-              <form method="POST" action="/update/{{ p.id }}">
+              <form method="POST" action="/update/{{ p.id }}" class="js-submit-once">
                 <button type="submit" class="btn-update">更新</button>
               </form>
               <a href="/edit/{{ p.id }}" class="btn-edit">編集</a>
@@ -579,6 +601,15 @@
   function esc(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+
+  document.querySelectorAll('.js-submit-once').forEach(form => {
+    form.addEventListener('submit', () => {
+      const button = form.querySelector('button[type="submit"]');
+      if (!button || button.disabled) return;
+      button.disabled = true;
+      button.textContent = '更新中…';
+    });
+  });
 </script>
 {% endif %}
 

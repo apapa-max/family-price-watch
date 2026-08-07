@@ -102,9 +102,14 @@ def is_yodobashi_available(status: str | None) -> bool:
 def fetch_yodobashi_data(url: str) -> dict | None:
     """ヨドバシの商品ページから価格・在庫文言を取得。失敗時はNoneを返す。"""
     try:
-        resp = requests.get(url, headers=_HEADERS, timeout=10)
+        resp = requests.get(url, headers=_HEADERS, timeout=(5, 20))
         resp.raise_for_status()
-    except Exception:
+    except Exception as e:
+        print(
+            f"[family-price-watch] Yodobashi fetch failed: {url} "
+            f"({type(e).__name__}: {e})",
+            flush=True,
+        )
         return None
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -122,6 +127,10 @@ def fetch_yodobashi_data(url: str) -> dict | None:
     )
     price = _parse_yen(price_text or "") or _parse_yen(page_text)
     if price is None:
+        print(
+            f"[family-price-watch] Yodobashi price not found: {url}",
+            flush=True,
+        )
         return None
 
     name = _first_text(

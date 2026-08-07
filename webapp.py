@@ -62,13 +62,15 @@ def init_db():
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 @app.route("/")
 def index():
+    notice = request.args.get("notice", "")
+    notice_type = request.args.get("notice_type", "info")
     conn = get_db()
     products = conn.execute(
         """SELECT * FROM products
@@ -77,7 +79,12 @@ def index():
            ORDER BY created_at DESC"""
     ).fetchall()
     conn.close()
-    return render_template("index.html", products=products)
+    return render_template(
+        "index.html",
+        products=products,
+        notice=notice,
+        notice_type=notice_type,
+    )
 
 
 @app.route("/add", methods=["GET", "POST"])
@@ -134,6 +141,23 @@ def add():
             created_by = created_by or None
             now = datetime.now().isoformat()
             conn = get_db()
+            conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute(
+                """SELECT id FROM products
+                   WHERE is_active = 1 AND site = ? AND url = ?
+                   LIMIT 1""",
+                (site, url),
+            ).fetchone()
+            if existing:
+                conn.rollback()
+                conn.close()
+                return redirect(
+                    url_for(
+                        "index",
+                        notice="同じ商品はすでに登録されています",
+                        notice_type="warning",
+                    )
+                )
             conn.execute(
                 """
                 INSERT INTO products
@@ -258,8 +282,22 @@ def delete(product_id):
 
 @app.route("/update/<int:product_id>", methods=["POST"])
 def update_price(product_id):
-    update_product_price(product_id)
-    return redirect(url_for("index"))
+    updated = update_product_price(product_id)
+    if updated:
+        return redirect(
+            url_for(
+                "index",
+                notice="価格と在庫を更新しました",
+                notice_type="success",
+            )
+        )
+    return redirect(
+        url_for(
+            "index",
+            notice="更新できませんでした。商品ページから価格情報を取得できなかった可能性があります",
+            notice_type="error",
+        )
+    )
 
 
 @app.route("/api/costco-search")

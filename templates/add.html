@@ -177,6 +177,12 @@
     .btn-primary:hover { opacity: .88; }
     .btn-cancel  { background: #edf2f7; color: #4a5568; }
     .btn-cancel:hover { background: #e2e8f0; }
+    .btn:disabled {
+      background: #edf2f7;
+      color: #a0aec0;
+      cursor: wait;
+      transform: none;
+    }
 
     /* ── Costco オートコンプリート ── */
     .autocomplete-wrap { position: relative; }
@@ -275,7 +281,7 @@
   <h1>商品を追加</h1>
 
   <div class="card">
-    <form method="POST" action="/add">
+    <form method="POST" action="/add" id="add-form">
 
       <!-- サイト -->
       <div class="field">
@@ -576,6 +582,13 @@
   function esc(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+
+  document.getElementById('add-form').addEventListener('submit', e => {
+    const button = e.currentTarget.querySelector('button[type="submit"]');
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    button.textContent = '登録中…';
+  });
 </script>
 
 </body>
