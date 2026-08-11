@@ -305,7 +305,7 @@
 
       <!-- 対応サイト専用：商品番号 -->
       <div class="field" id="field-item-code" style="display:none">
-        <label><span id="item-code-label">商品番号</span> <span class="required">必須</span></label>
+        <label><span id="item-code-label">商品番号</span> <span class="required" id="item-code-required">必須</span></label>
         <input type="text" id="item-code" name="item_code"
                value="{{ form_data.get('item_code', '') }}"
                placeholder="例：1743978"
@@ -317,11 +317,23 @@
         <p class="item-code-status" id="item-code-status"></p>
       </div>
 
-      <!-- 商品名 -->
+      <!-- ヨドバシ専用：URL -->
+      <div class="field" id="field-url" style="display:none">
+        <label>商品URL <span class="optional">商品番号の代わりに入力できます</span></label>
+        <input type="url" id="url-input" name="url"
+               value="{{ form_data.get('url', '') }}"
+               placeholder="https://www.yodobashi.com/product/..."
+               class="{{ 'error' if errors.url }}">
+        {% if errors.url %}
+          <p class="error-msg">{{ errors.url }}</p>
+        {% endif %}
+      </div>
+
+      <!-- 詳細項目 -->
       <button type="button" class="details-toggle" id="details-toggle">
         <span>
           <span class="details-title">詳細項目</span>
-          <span class="details-summary">商品名 / 商品URL / 追加者</span>
+          <span class="details-summary">商品名 / 追加者</span>
         </span>
         <span class="details-arrow" id="details-arrow">開く ▾</span>
       </button>
@@ -341,18 +353,6 @@
             <p class="error-msg">{{ errors.name }}</p>
           {% endif %}
           <p class="hint" id="name-hint" style="display:none">Costcoを選択すると商品名で候補を検索します</p>
-        </div>
-
-        <!-- URL -->
-        <div class="field">
-          <label>商品URL <span class="required" id="url-required">必須</span></label>
-          <input type="url" id="url-input" name="url"
-                 value="{{ form_data.get('url', '') }}"
-                 placeholder="https://..."
-                 class="{{ 'error' if errors.url }}">
-          {% if errors.url %}
-            <p class="error-msg">{{ errors.url }}</p>
-          {% endif %}
         </div>
 
         <!-- 追加者 -->
@@ -402,16 +402,17 @@
   const nameInput      = document.getElementById('name-input');
   const nameHint       = document.getElementById('name-hint');
   const urlInput       = document.getElementById('url-input');
+  const fieldUrl       = document.getElementById('field-url');
   const createdByInput = document.getElementById('created-by-input');
   const acList         = document.getElementById('autocomplete-list');
   const detailsToggle  = document.getElementById('details-toggle');
   const detailsArrow   = document.getElementById('details-arrow');
   const advancedFields = document.getElementById('advanced-fields');
   const itemCodeLabel  = document.getElementById('item-code-label');
+  const itemCodeRequired = document.getElementById('item-code-required');
 
   const nameRequired = document.getElementById('name-required');
-  const urlRequired  = document.getElementById('url-required');
-  const hasAdvancedErrors = {{ 'true' if errors.name or errors.url or errors.created_by else 'false' }};
+  const hasAdvancedErrors = {{ 'true' if errors.name or errors.created_by else 'false' }};
   let advancedOpen = hasAdvancedErrors;
 
   function isCostcoWithCode() {
@@ -420,7 +421,7 @@
 
   function updateRequiredBadges() {
     const optional = siteSelect.value === 'Costco' || siteSelect.value === 'ヨドバシ.com';
-    [nameRequired, urlRequired].forEach(el => {
+    [nameRequired].forEach(el => {
       if (optional) {
         el.textContent = '任意';
         el.className = 'optional';
@@ -444,7 +445,10 @@
     const isYodobashi = siteSelect.value === 'ヨドバシ.com';
     const canLookupByCode = isCostco || isYodobashi;
     fieldItemCode.style.display = canLookupByCode ? '' : 'none';
+    fieldUrl.style.display = isYodobashi ? '' : 'none';
     itemCodeLabel.textContent = isYodobashi ? '商品番号（ヨドバシ）' : '商品番号（Costco）';
+    itemCodeRequired.textContent = isYodobashi ? 'URLでも可' : '必須';
+    itemCodeRequired.className = isYodobashi ? 'optional' : 'required';
     itemCodeInput.placeholder = isYodobashi ? '例：100000001234567890' : '例：1743978';
     nameHint.style.display      = isCostco ? '' : 'none';
     if (!isCostco) closeAc();

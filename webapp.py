@@ -114,10 +114,10 @@ def add():
             errors["item_code"] = "ヨドバシの商品番号か商品URLを入力してください"
         if not name and not (is_costco or is_yodobashi):
             errors["name"] = "商品名を入力してください"
-        if not url:
-            if costco_with_code:
-                url = f"https://www.costco.co.jp/p/{item_code}"
-            elif yodobashi_with_code:
+        if costco_with_code:
+            url = f"https://www.costco.co.jp/p/{item_code}"
+        elif not url:
+            if yodobashi_with_code:
                 url = f"https://www.yodobashi.com/product/{item_code}/"
             elif not (is_costco or is_yodobashi):
                 errors["url"] = "URLを入力してください"

@@ -7,11 +7,18 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html {
+      min-height: 100%;
+      overflow-y: auto;
+    }
+
     body {
       font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
       background: #f5f6f8;
       color: #1a1a2e;
       min-height: 100vh;
+      overflow-y: auto;
+      padding-bottom: 32px;
     }
 
     header {
@@ -158,6 +165,21 @@
     .btn-primary:hover { opacity: .88; }
     .btn-cancel  { background: #edf2f7; color: #4a5568; }
     .btn-cancel:hover { background: #e2e8f0; }
+    .btn-delete-inline {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #fed7d7;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      background: #fff;
+      color: #c53030;
+      transition: background .15s;
+      margin-top: 16px;
+    }
+    .btn-delete-inline:hover { background: #fff5f5; }
 
     /* 読み取り専用情報 */
     .info-grid {
@@ -189,25 +211,6 @@
     .info-value.price { font-weight: 700; color: #276749; }
     .info-value.sale  { font-weight: 700; color: #c53030; }
 
-    /* 削除カード */
-    .card-danger {
-      border: 1px solid #fed7d7;
-    }
-    .card-danger .card-title { color: #c53030; }
-    .btn-delete-full {
-      width: 100%;
-      height: 44px;
-      border: none;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      background: #fff5f5;
-      color: #c53030;
-      transition: background .15s;
-    }
-    .btn-delete-full:hover { background: #fed7d7; }
   </style>
 </head>
 <body>
@@ -253,6 +256,10 @@
         <button type="submit" class="btn btn-primary">保存する</button>
       </div>
 
+    </form>
+    <form method="POST" action="/delete/{{ product.id }}"
+          onsubmit="return confirm('「{{ product.name }}」を削除しますか？')">
+      <button type="submit" class="btn-delete-inline">この商品を削除する</button>
     </form>
   </div>
 
@@ -317,15 +324,6 @@
         {% endif %}
       </div>
     </div>
-  </div>
-
-  <!-- 削除 -->
-  <div class="card card-danger">
-    <p class="card-title">削除</p>
-    <form method="POST" action="/delete/{{ product.id }}"
-          onsubmit="return confirm('「{{ product.name }}」を削除しますか？')">
-      <button type="submit" class="btn-delete-full">この商品を削除する</button>
-    </form>
   </div>
 
 </div>

@@ -60,6 +60,7 @@ def fetch_costco_data(item_code: str) -> dict | None:
     base_price = (d.get("basePrice") or {}).get("value")
     coupon = d.get("couponDiscount") or {}
     stock = d.get("stock") or {}
+    name = _clean_text(d.get("name") or d.get("productName") or d.get("displayName") or "")
 
     return {
         "price": price,
@@ -70,6 +71,7 @@ def fetch_costco_data(item_code: str) -> dict | None:
         "stock_level": stock.get("stockLevel"),
         "stock_level_status": stock.get("stockLevelStatus"),
         "min_order_quantity": d.get("minOrderQuantity"),
+        "name": name or None,
     }
 
 
@@ -331,7 +333,7 @@ def _update_product(conn, p: sqlite3.Row, now: str) -> bool:
     # 在庫わずか通知
     stock_level = data["stock_level"]
     if stock_level is not None and stock_level <= STOCK_ALERT_THRESHOLD and not is_stock_notified:
-        notify_low_stock(p["name"], data)
+        notify_low_stock(product_name, data)
         is_stock_notified = 1
     elif stock_level is None:
         was_unavailable = old_stock_status and not is_yodobashi_available(old_stock_status)
