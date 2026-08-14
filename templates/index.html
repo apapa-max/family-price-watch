@@ -150,10 +150,15 @@
     }
     tbody tr {
       border-bottom: 1px solid #f0f2f5;
-      transition: background .15s;
+      scroll-margin-top: 76px;
+      transition: background .15s, box-shadow .2s;
     }
     tbody tr:last-child { border-bottom: none; }
     tbody tr:hover { background: #fafbfc; }
+    tbody tr.updated-row {
+      background: #f0fdf4;
+      box-shadow: inset 4px 0 0 #4ade80;
+    }
     td { padding: 14px 16px; vertical-align: middle; }
 
     /* サイトバッジ */
@@ -413,7 +418,10 @@
       </thead>
       <tbody id="product-tbody">
         {% for p in products %}
-        <tr data-name="{{ p.name | lower }}">
+        <tr id="product-{{ p.id }}"
+            data-product-id="{{ p.id }}"
+            data-name="{{ p.name | lower }}"
+            class="{% if updated_id|string == p.id|string %}updated-row{% endif %}">
           <td data-label="サイト">
             {% set site_lower = p.site | lower %}
             {% if "costco" in site_lower %}
@@ -545,6 +553,7 @@
   const filterCount = document.getElementById('filter-count');
   const noResults   = document.getElementById('no-results');
   const rows        = Array.from(document.querySelectorAll('#product-tbody tr'));
+  const updatedId   = '{{ updated_id }}';
   const total       = rows.length;
 
   const originalNames = rows.map(r => {
@@ -610,6 +619,18 @@
       button.textContent = '更新中…';
     });
   });
+
+  if (updatedId) {
+    const updatedRow = document.getElementById(`product-${updatedId}`);
+    if (updatedRow) {
+      requestAnimationFrame(() => {
+        updatedRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        window.setTimeout(() => {
+          updatedRow.classList.remove('updated-row');
+        }, 4500);
+      });
+    }
+  }
 </script>
 {% endif %}
 

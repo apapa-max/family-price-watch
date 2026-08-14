@@ -71,6 +71,7 @@ def get_db():
 def index():
     notice = request.args.get("notice", "")
     notice_type = request.args.get("notice_type", "info")
+    updated_id = request.args.get("updated_id", "")
     conn = get_db()
     products = conn.execute(
         """SELECT * FROM products
@@ -84,6 +85,7 @@ def index():
         products=products,
         notice=notice,
         notice_type=notice_type,
+        updated_id=updated_id,
     )
 
 
@@ -292,6 +294,8 @@ def update_price(product_id):
                 "index",
                 notice="価格と在庫を更新しました",
                 notice_type="success",
+                updated_id=product_id,
+                _anchor=f"product-{product_id}",
             )
         )
     return redirect(
@@ -299,6 +303,8 @@ def update_price(product_id):
             "index",
             notice="更新できませんでした。商品ページから価格情報を取得できなかった可能性があります",
             notice_type="error",
+            updated_id=product_id,
+            _anchor=f"product-{product_id}",
         )
     )
 
